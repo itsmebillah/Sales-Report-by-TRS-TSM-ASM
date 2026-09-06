@@ -1,0 +1,22 @@
+{
+  "spreadsheetId": "fixture",
+  "tab": "Sales Data Base Monthly",
+  "range": "A1:K15",
+  "values": [
+    ["September'26"],
+    ["Start Date", "1-Sep-2026"],
+    ["Monthly WD", 26],
+    ["ID", "RSM", "TSO", "SR", "Designation", "Dealer SL", "AREA/ Point", "Sales of September'26", "September'26 Monthly Tgt. Product Wise Value", "No. of Order", "Current WD"],
+    [null, "TSM South", "TRS Alpha", null, null, null, "Territory Alpha"],
+    ["P001", "TSM South", "TRS Alpha", "Person One", "SR", "D001", "Dealer One", 60000, 200000, 30, 6],
+    ["P002", "TSM South", "TRS Alpha", "Person Two", "SR", "D002", "Dealer Two", 40000, 100000, 20, 5],
+    ["TRS01", "TSM South", "TRS Alpha", null, "T.S.O."],
+    ["TSM01", "TSM South", null, null, "RSM"],
+    ["ASM01", "ASM South", null, "South Area", "A.S.M."],
+    [null, "TSM North", "TRS Beta", null, null, null, "Territory Beta"],
+    ["P003", "TSM North", "TRS Beta", "Person Three", "SR", "D003", "Dealer Three", 50000, null, 0, 0],
+    ["TRS02", "TSM North", "TRS Beta", null, "T.S.O."],
+    ["TSM02", "TSM North", null, null, "RSM"],
+    ["ASM02", "ASM North", null, "North Area", "A.S.M."]
+  ]
+}

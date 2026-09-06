@@ -1,0 +1,22 @@
+{
+  "name": "sales-report-by-trs-tsm-asm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monthly Google Sheets sales reporting and guarded WhatsApp PDF delivery service",
+  "type": "module",
+  "main": "src/app.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/app.js",
+    "report:generate": "node src/cli/report.js --dry-run",
+    "report:dry-run": "node src/cli/report.js --dry-run",
+    "report:sample": "node src/cli/report.js --fixture tests/fixtures/source-sheet.json --dry-run",
+    "test": "node --test",
+    "lint": "node --check src/app.js && node --check src/jobs/reportJob.js && node --check src/pdf/renderer.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "googleapis": "^159.0.0",
+    "pdfkit": "^0.17.2"
+  }
+}

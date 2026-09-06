@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+credentials*.json
+config/recipients.json
+*.pem
+*.key
+.wwebjs_auth/
+.wwebjs_cache/
+whatsapp-session*/
+output/pdf/*.pdf
+output/state/*.json
+output/logs/
+tmp/
+coverage/
+npm-debug.log*
