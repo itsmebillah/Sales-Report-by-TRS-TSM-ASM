@@ -2,9 +2,18 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const DELIVERY_STATUS = Object.freeze({
-  GENERATED: 'GENERATED', DRY_RUN: 'DRY_RUN', QUEUED: 'QUEUED', SENT: 'SENT',
-  FAILED: 'FAILED', SKIPPED: 'SKIPPED'
+  GENERATED: 'GENERATED', DRY_RUN: 'DRY_RUN', QUEUED: 'QUEUED', SENDING: 'SENDING',
+  CONFIRMATION_PENDING: 'CONFIRMATION_PENDING', SENT: 'SENT', FAILED: 'FAILED', SKIPPED: 'SKIPPED'
 });
+
+export function blocksAutomaticDelivery(record) {
+  return Boolean(record && (
+    record.everSent ||
+    record.status === DELIVERY_STATUS.SENT ||
+    record.status === DELIVERY_STATUS.SENDING ||
+    record.status === DELIVERY_STATUS.CONFIRMATION_PENDING
+  ));
+}
 
 export class DeliveryStore {
   constructor(filePath) {

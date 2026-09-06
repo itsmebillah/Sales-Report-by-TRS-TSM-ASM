@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { DeliveryStore, DELIVERY_STATUS } from '../src/jobs/deliveryStore.js';
+import { blocksAutomaticDelivery, DeliveryStore, DELIVERY_STATUS } from '../src/jobs/deliveryStore.js';
 import { isValidRecipient, resolveRecipient } from '../src/whatsapp/recipientResolver.js';
 import { createReportFilename, createReportId } from '../src/utils/reportIdentity.js';
 
@@ -24,6 +24,14 @@ test('delivery state persists exact statuses for duplicate protection', async (t
   assert.equal(afterPreview.status, DELIVERY_STATUS.DRY_RUN);
   assert.equal(afterPreview.everSent, true);
   assert.equal(afterPreview.sentAt, record.sentAt);
+});
+
+test('uncertain WhatsApp dispatch states block automatic duplicate delivery', () => {
+  assert.equal(blocksAutomaticDelivery({ status: DELIVERY_STATUS.SENDING }), true);
+  assert.equal(blocksAutomaticDelivery({ status: DELIVERY_STATUS.CONFIRMATION_PENDING }), true);
+  assert.equal(blocksAutomaticDelivery({ status: DELIVERY_STATUS.SENT, everSent: true }), true);
+  assert.equal(blocksAutomaticDelivery({ status: DELIVERY_STATUS.FAILED }), false);
+  assert.equal(blocksAutomaticDelivery(null), false);
 });
 
 test('recipient resolution supports IDs, normalized names, and test override', () => {

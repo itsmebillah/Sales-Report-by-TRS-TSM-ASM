@@ -3,6 +3,7 @@ node_modules/
 .env.*
 !.env.example
 credentials*.json
+apps-script/.clasp.json
 config/recipients.json
 *.pem
 *.key

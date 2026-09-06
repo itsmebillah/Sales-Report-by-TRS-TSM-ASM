@@ -2,7 +2,9 @@
 
 ## Source safety
 
-The service requests values only through the Google Sheets read-only scope. It does not expose a write method. The configured range defaults to `A:DS`, so no row count such as 960 or 1,000 is embedded in application logic.
+The controlled Apps Script bridge is the only component authorized against Google Sheets. Its manifest requests `spreadsheets.readonly`, it opens only the spreadsheet and tab fixed in Script Properties, and it contains no spreadsheet write method. The bridge determines the current last row dynamically and caps the read at 123 columns (`A:DS`) and 250,000 cells.
+
+Node sends a POST request containing an action and a high-entropy bearer token to an allow-listed Google Apps Script HTTPS host. The token is kept in Script Properties and the untracked Node `.env`; it is not placed in the URL. The response tab is checked before parsing. Response size and request duration are bounded.
 
 ## Header and row resolution
 
@@ -38,7 +40,7 @@ All divisions are safe and return `null` when the denominator is unavailable or 
 ## Pipeline
 
 ```text
-Google Sheets / fixture
+Apps Script read-only bridge / fixture
   -> source parser
   -> hierarchy resolver + diagnostics
   -> normalized field-force records
@@ -46,14 +48,18 @@ Google Sheets / fixture
   -> report model
   -> server-side PDF
   -> persistent delivery state
-  -> dry-run or guarded WhatsApp provider
+  -> dry-run or guarded WhatsApp Web provider
 ```
 
 ## Delivery safety
 
-Report IDs are deterministic for `month + report type + entity`. A JSON state store records `GENERATED`, `DRY_RUN`, `QUEUED`, `SENT`, `FAILED`, or `SKIPPED`. A prior `SENT` record prevents another real send. Dry runs never record `SENT`.
+Report IDs are deterministic for `month + report type + entity`. A JSON state store records `GENERATED`, `DRY_RUN`, `QUEUED`, `SENDING`, `CONFIRMATION_PENDING`, `SENT`, `FAILED`, or `SKIPPED`. A prior `SENT`, `SENDING`, or `CONFIRMATION_PENDING` state prevents another automatic real send. This deliberately favors manual reconciliation over duplicate delivery after a crash or ambiguous WhatsApp acknowledgement. Dry runs never initialize WhatsApp and never record `SENT`.
 
 Missing recipients are logged and skipped without stopping other reports. Production recipients are blocked unless `ALLOW_REAL_DELIVERY=true`. Test mode always overrides mappings with `WHATSAPP_TEST_RECIPIENT`.
+
+WhatsApp uses `whatsapp-web.js`, `LocalAuth`, and a persistent ignored browser profile. The first authentication is performed with `npm run whatsapp:login`. Before dispatch, WhatsApp resolves the international number on its server. PDFs are sent as document attachments with captions; text delivery is also supported. An ACK below server-received status becomes `CONFIRMATION_PENDING` and is not blindly retried.
+
+The project requires Node.js 22.12 or newer and overrides the browser automation dependency to a patched Puppeteer release. The override is pinned and covered by the dependency audit; it must be retested whenever `whatsapp-web.js` changes.
 
 ## Remaining source decisions
 

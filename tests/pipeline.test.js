@@ -64,3 +64,16 @@ test('reports orphan TRS summaries instead of silently accepting them', () => {
   const result = pipeline(values);
   assert.ok(result.normalized.diagnostics.some((item) => item.code === 'ORPHAN_TRS_SUMMARY'));
 });
+
+test('keeps the known Md. Anisur Rahman and Md.Arif Hossain conflict explicit', () => {
+  const values = structuredClone(fixture.values);
+  values[4][1] = 'Md. Anisur Rahman';
+  values[5][1] = 'Md.Arif Hossain';
+  values[6][1] = 'Md.Arif Hossain';
+  values[7][1] = 'Md.Arif Hossain';
+  const result = pipeline(values, 'summary_wins');
+  const conflict = result.normalized.diagnostics.find((item) => item.code === 'CONFLICTING_TRS_TSM_MAPPING');
+  assert.ok(conflict);
+  assert.equal(conflict.separatorTsm, 'Md. Anisur Rahman');
+  assert.equal(conflict.summaryTsm, 'Md.Arif Hossain');
+});

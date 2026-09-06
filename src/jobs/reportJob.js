@@ -6,9 +6,9 @@ import { normalizeSource } from '../data/normalizer.js';
 import { buildReports } from '../reports/reportBuilder.js';
 import { renderReportPdf } from '../pdf/renderer.js';
 import { createReportFilename, createReportId } from '../utils/reportIdentity.js';
-import { DeliveryStore, DELIVERY_STATUS } from './deliveryStore.js';
+import { blocksAutomaticDelivery, DeliveryStore, DELIVERY_STATUS } from './deliveryStore.js';
 import { loadRecipientMappings, resolveRecipient } from '../whatsapp/recipientResolver.js';
-import { WhatsAppCloudSender } from '../whatsapp/sender.js';
+import { WhatsAppWebSender } from '../whatsapp/sender.js';
 
 function diagnosticSummary(diagnostics) {
   const byCode = {};
@@ -27,7 +27,7 @@ function caption(template, report) {
     .replaceAll('{month}', report.month);
 }
 
-export async function runReportJob({ config, fixturePath = null, logger }) {
+export async function runReportJob({ config, fixturePath = null, logger, sender: suppliedSender = null }) {
   const startedAt = Date.now();
   const source = fixturePath ? await readFixture(fixturePath) : await readGoogleSheet(config.google);
   logger.info('source_read_completed', { source: source.source, range: source.range, sourceRowCount: source.values.length });
@@ -50,19 +50,22 @@ export async function runReportJob({ config, fixturePath = null, logger }) {
   const reportSet = buildReports(normalized.records, { strictTargetCoverage: config.report.strictTargetCoverage });
   const mappings = await loadRecipientMappings(config.recipientsFile);
   const store = new DeliveryStore(config.report.stateFile);
-  const sender = new WhatsAppCloudSender(config.whatsapp);
+  const sender = suppliedSender || new WhatsAppWebSender(config.whatsapp);
   const results = [];
 
-  for (const report of reportSet.all) {
+  try {
+    for (const report of reportSet.all) {
     const reportId = createReportId({ type: report.type, entityId: report.entity.id, entityName: report.entity.name, month: report.month });
     const fileName = createReportFilename({ type: report.type, entityName: report.entity.name, month: report.month, reportId });
     const filePath = path.join(config.report.outputDir, fileName);
     const reportLogger = logger.child({ reportId, reportType: report.type, entityName: report.entity.name, month: report.month });
     const previous = await store.get(reportId);
-    if (!config.delivery.dryRun && (previous?.everSent || previous?.status === DELIVERY_STATUS.SENT)) {
-      await store.set(reportId, DELIVERY_STATUS.SKIPPED, { reason: 'already_sent', previousMessageId: previous.messageId });
-      reportLogger.warn('report_delivery_skipped', { reason: 'already_sent' });
-      results.push({ reportId, status: DELIVERY_STATUS.SKIPPED, reason: 'already_sent' });
+    if (!config.delivery.dryRun && blocksAutomaticDelivery(previous)) {
+      const reason = previous.status === DELIVERY_STATUS.SENDING || previous.status === DELIVERY_STATUS.CONFIRMATION_PENDING
+        ? 'previous_dispatch_requires_reconciliation'
+        : 'already_sent';
+      reportLogger.warn('report_delivery_skipped', { reason, previousStatus: previous.status, previousMessageId: previous.messageId });
+      results.push({ reportId, status: DELIVERY_STATUS.SKIPPED, reason });
       continue;
     }
 
@@ -89,19 +92,33 @@ export async function runReportJob({ config, fixturePath = null, logger }) {
       }
 
       await store.set(reportId, DELIVERY_STATUS.QUEUED, { filePath, recipient: recipient.recipient });
+      await store.set(reportId, DELIVERY_STATUS.SENDING, { filePath, recipient: recipient.recipient });
       const delivery = await sender.sendDocument({
         recipient: recipient.recipient,
         filePath,
         caption: caption(config.whatsapp.captionTemplate, report)
       });
-      await store.set(reportId, DELIVERY_STATUS.SENT, { filePath, recipient: recipient.recipient, messageId: delivery.messageId, mediaId: delivery.mediaId });
-      reportLogger.info('report_delivery_completed', { recipient: recipient.recipient, file: filePath, status: DELIVERY_STATUS.SENT, messageId: delivery.messageId });
-      results.push({ reportId, status: DELIVERY_STATUS.SENT, messageId: delivery.messageId });
+      if (delivery.success && delivery.outcome === 'CONFIRMED') {
+        await store.set(reportId, DELIVERY_STATUS.SENT, { filePath, recipient: recipient.recipient, messageId: delivery.messageId, ack: delivery.ack });
+        reportLogger.info('report_delivery_completed', { recipient: recipient.recipient, file: filePath, status: DELIVERY_STATUS.SENT, messageId: delivery.messageId, ack: delivery.ack });
+        results.push({ reportId, status: DELIVERY_STATUS.SENT, messageId: delivery.messageId });
+      } else if (delivery.outcome === 'CONFIRMATION_PENDING') {
+        await store.set(reportId, DELIVERY_STATUS.CONFIRMATION_PENDING, { filePath, recipient: recipient.recipient, messageId: delivery.messageId, ack: delivery.ack, error: delivery.error });
+        reportLogger.warn('report_delivery_confirmation_pending', { file: filePath, status: DELIVERY_STATUS.CONFIRMATION_PENDING, messageId: delivery.messageId, ack: delivery.ack, error: delivery.error });
+        results.push({ reportId, status: DELIVERY_STATUS.CONFIRMATION_PENDING, messageId: delivery.messageId, error: delivery.error });
+      } else {
+        await store.set(reportId, DELIVERY_STATUS.FAILED, { filePath, error: delivery.error || 'definite_delivery_failure' });
+        reportLogger.error('report_delivery_failed', { file: filePath, status: DELIVERY_STATUS.FAILED, error: delivery.error });
+        results.push({ reportId, status: DELIVERY_STATUS.FAILED, error: delivery.error });
+      }
     } catch (error) {
       await store.set(reportId, DELIVERY_STATUS.FAILED, { filePath, error: error.message });
       reportLogger.error('report_processing_failed', { file: filePath, status: DELIVERY_STATUS.FAILED, error: error.message });
       results.push({ reportId, status: DELIVERY_STATUS.FAILED, error: error.message });
     }
+  }
+  } finally {
+    await sender.disconnect?.().catch((error) => logger.warn('whatsapp_disconnect_failed', { error: error.message }));
   }
 
   const statusCounts = results.reduce((counts, result) => ({ ...counts, [result.status]: (counts[result.status] || 0) + 1 }), {});

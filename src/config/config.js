@@ -25,9 +25,13 @@ export function loadConfig(overrides = {}) {
     env: env.NODE_ENV || 'development',
     logLevel: env.LOG_LEVEL || 'info',
     google: {
-      sheetId: env.GOOGLE_SHEET_ID || '',
-      tab: env.GOOGLE_SHEET_TAB || 'Sales Data Base Monthly',
-      range: env.GOOGLE_SHEET_RANGE || 'A:DS'
+      dataSource: env.GOOGLE_DATA_SOURCE || 'apps_script',
+      bridgeUrl: env.APPS_SCRIPT_BRIDGE_URL || '',
+      bridgeToken: env.APPS_SCRIPT_BRIDGE_TOKEN || '',
+      bridgeTimeoutMs: positiveInt(env.APPS_SCRIPT_BRIDGE_TIMEOUT_MS, 60_000),
+      maxResponseBytes: positiveInt(env.APPS_SCRIPT_BRIDGE_MAX_RESPONSE_BYTES, 15_000_000),
+      expectedSpreadsheetId: env.GOOGLE_SHEET_ID || '',
+      expectedTab: env.GOOGLE_SHEET_TAB || 'Sales Data Base Monthly'
     },
     report: {
       outputDir: path.resolve(cwd, env.REPORT_OUTPUT_DIR || 'output/pdf'),
@@ -45,11 +49,14 @@ export function loadConfig(overrides = {}) {
     },
     whatsapp: {
       enabled: bool(env.WHATSAPP_ENABLED, false),
-      apiVersion: env.WHATSAPP_GRAPH_API_VERSION || 'v23.0',
-      phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
-      accessToken: env.WHATSAPP_ACCESS_TOKEN || '',
       testRecipient: env.WHATSAPP_TEST_RECIPIENT || '',
-      captionTemplate: env.WHATSAPP_CAPTION_TEMPLATE || 'Monthly {reportType} performance report for {entityName} - {month}'
+      captionTemplate: env.WHATSAPP_CAPTION_TEMPLATE || 'Monthly {reportType} performance report for {entityName} - {month}',
+      sessionDir: path.resolve(cwd, env.WHATSAPP_SESSION_DIR || '.wwebjs_auth'),
+      sessionName: env.WHATSAPP_SESSION_NAME || 'sales-report',
+      browserPath: env.WHATSAPP_BROWSER_PATH || '',
+      headless: bool(env.WHATSAPP_HEADLESS, true),
+      connectTimeoutMs: positiveInt(env.WHATSAPP_CONNECT_TIMEOUT_MS, 120_000),
+      ackTimeoutMs: positiveInt(env.WHATSAPP_ACK_TIMEOUT_MS, 30_000)
     },
     scheduler: {
       runOnStart: bool(env.RUN_ON_START, false),
@@ -59,7 +66,12 @@ export function loadConfig(overrides = {}) {
 }
 
 export function validateRuntimeConfig(config, { fixturePath } = {}) {
-  if (!fixturePath && !config.google.sheetId) throw new Error('GOOGLE_SHEET_ID is required');
+  if (!fixturePath && config.google.dataSource !== 'apps_script') {
+    throw new Error(`Unsupported GOOGLE_DATA_SOURCE: ${config.google.dataSource}`);
+  }
+  if (!fixturePath && !config.google.bridgeUrl) throw new Error('APPS_SCRIPT_BRIDGE_URL is required');
+  if (!fixturePath && !config.google.bridgeToken) throw new Error('APPS_SCRIPT_BRIDGE_TOKEN is required');
+  if (!fixturePath && !config.google.expectedSpreadsheetId) throw new Error('GOOGLE_SHEET_ID is required for source verification');
   if (!config.delivery.dryRun && !config.whatsapp.enabled) {
     throw new Error('Real run requested while WHATSAPP_ENABLED is false');
   }
