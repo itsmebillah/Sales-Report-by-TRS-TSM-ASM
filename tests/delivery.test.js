@@ -28,11 +28,11 @@ test('delivery state persists exact statuses for duplicate protection', async (t
 
 test('recipient resolution supports IDs, normalized names, and test override', () => {
   const report = { type: 'trs', entity: { id: 'TRS01', name: 'TRS Alpha' } };
-  const mappings = { asm: {}, tsm: {}, trs: { TRS01: '+8801712345678', 'trs-alpha': '+8801812345678' } };
-  assert.equal(resolveRecipient(report, mappings, { testMode: false }).recipient, '+8801712345678');
-  assert.equal(resolveRecipient(report, mappings, { testMode: true, testRecipient: '+8801912345678' }).recipient, '+8801912345678');
-  assert.equal(isValidRecipient('+8801712345678'), true);
-  assert.equal(isValidRecipient('01712345678'), false);
+  const mappings = { asm: {}, tsm: {}, trs: { TRS01: '+999000000001', 'trs-alpha': '+999000000002' } };
+  assert.equal(resolveRecipient(report, mappings, { testMode: false }).recipient, '+999000000001');
+  assert.equal(resolveRecipient(report, mappings, { testMode: true, testRecipient: '+999000000003' }).recipient, '+999000000003');
+  assert.equal(isValidRecipient('+999000000001'), true);
+  assert.equal(isValidRecipient('not-e164'), false);
 });
 
 test('report IDs and filenames are deterministic and safe', () => {
