@@ -9,6 +9,8 @@ import { createReportFilename, createReportId } from '../utils/reportIdentity.js
 import { blocksAutomaticDelivery, DeliveryStore, DELIVERY_STATUS } from './deliveryStore.js';
 import { loadRecipientMappings, resolveRecipient } from '../whatsapp/recipientResolver.js';
 import { WhatsAppWebSender } from '../whatsapp/sender.js';
+import { applyDashboardSettings } from '../config/dashboard.js';
+import { validateRuntimeConfig } from '../config/config.js';
 
 function diagnosticSummary(diagnostics) {
   const byCode = {};
@@ -30,6 +32,8 @@ function caption(template, report) {
 export async function runReportJob({ config, fixturePath = null, logger, sender: suppliedSender = null }) {
   const startedAt = Date.now();
   const source = fixturePath ? await readFixture(fixturePath) : await readGoogleSheet(config.google);
+  config = applyDashboardSettings(config, source.settings);
+  validateRuntimeConfig(config, { fixturePath });
   logger.info('source_read_completed', { source: source.source, range: source.range, sourceRowCount: source.values.length });
 
   const parsed = parseSheetValues(source.values, {
@@ -47,7 +51,15 @@ export async function runReportJob({ config, fixturePath = null, logger, sender:
     throw new Error('Report month and monthly working days are required after source parsing');
   }
 
-  const reportSet = buildReports(normalized.records, { strictTargetCoverage: config.report.strictTargetCoverage });
+  const completeReportSet = buildReports(normalized.records, { strictTargetCoverage: config.report.strictTargetCoverage });
+  const enabledTypes = config.report.enabledTypes || { trs: true, tsm: true, asm: true };
+  const reportSet = {
+    ...completeReportSet,
+    trs: enabledTypes.trs ? completeReportSet.trs : [],
+    tsm: enabledTypes.tsm ? completeReportSet.tsm : [],
+    asm: enabledTypes.asm ? completeReportSet.asm : []
+  };
+  reportSet.all = [...reportSet.trs, ...reportSet.tsm, ...reportSet.asm];
   const mappings = await loadRecipientMappings(config.recipientsFile);
   const store = new DeliveryStore(config.report.stateFile);
   const sender = suppliedSender || new WhatsAppWebSender(config.whatsapp);
@@ -56,6 +68,9 @@ export async function runReportJob({ config, fixturePath = null, logger, sender:
   try {
     for (const report of reportSet.all) {
     const reportId = createReportId({ type: report.type, entityId: report.entity.id, entityName: report.entity.name, month: report.month });
+    if (!config.delivery.dryRun && config.delivery.testMode && reportId !== config.delivery.testReportId) {
+      continue;
+    }
     const fileName = createReportFilename({ type: report.type, entityName: report.entity.name, month: report.month, reportId });
     const filePath = path.join(config.report.outputDir, fileName);
     const reportLogger = logger.child({ reportId, reportType: report.type, entityName: report.entity.name, month: report.month });

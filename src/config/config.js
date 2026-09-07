@@ -45,7 +45,8 @@ export function loadConfig(overrides = {}) {
     delivery: {
       dryRun: bool(env.DRY_RUN, true),
       testMode: bool(env.TEST_MODE, true),
-      allowRealDelivery: bool(env.ALLOW_REAL_DELIVERY, false)
+      allowRealDelivery: bool(env.ALLOW_REAL_DELIVERY, false),
+      testReportId: env.WHATSAPP_TEST_REPORT_ID || ''
     },
     whatsapp: {
       enabled: bool(env.WHATSAPP_ENABLED, false),
@@ -77,6 +78,9 @@ export function validateRuntimeConfig(config, { fixturePath } = {}) {
   }
   if (!config.delivery.dryRun && config.delivery.testMode && !config.whatsapp.testRecipient) {
     throw new Error('WHATSAPP_TEST_RECIPIENT is required when TEST_MODE=true and DRY_RUN=false');
+  }
+  if (!config.delivery.dryRun && config.delivery.testMode && !config.delivery.testReportId) {
+    throw new Error('WHATSAPP_TEST_REPORT_ID is required to limit test delivery to exactly one report');
   }
   if (!config.delivery.dryRun && !config.delivery.testMode && !config.delivery.allowRealDelivery) {
     throw new Error('Production delivery requires ALLOW_REAL_DELIVERY=true');

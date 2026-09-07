@@ -1,46 +1,39 @@
 # Controlled Apps Script read-only bridge
 
-This repository contains the proposed bridge source in `apps-script/`. It has not been pushed or deployed to Apps Script. The controlled target project is:
+The bridge is a deliberately narrow, POST-only boundary for Apps Script project
+`1xOnrcVDozZKVE4OfRqMlDRJ-xhQCS8UNoWSvwfbHVX5Lmlc5Fuu67R2E`.
+
+## Security boundary
+
+- The spreadsheet ID, source tab, source header row, source columns, and maximum source row/column bounds are constants in `SalesDataBridge.js`.
+- Authentication is evaluated before the action. Every denied or failed request returns the same `request_denied` response.
+- Callers cannot select a spreadsheet, tab, or range. Extra request properties are ignored.
+- The raw token exists only in the Node host's ignored `.env`. Apps Script stores only its lowercase SHA-256 digest.
+- There is no `doGet` function.
+- The manifest has only `spreadsheets.readonly` and declares a web app that executes as the deployer.
+- The response projects only ID, hierarchy names, designation, hierarchy territory, sales, target, orders, and working days. Dealer/customer text is blanked on SR rows. Salary, TADA, joining dates, phone/contact fields, recipient mappings, and unused source columns are never returned.
+- Dashboard configuration is read from fixed cells only. The bridge does not read the test-recipient cell or the recipient-mapping table.
+
+Required Script Property name:
 
 ```text
-1xOnrcVDozZKVE4OfRqMlDRJ-xhQCS8UNoWSvwfbHVX5Lmlc5Fuu67R2E
+SALES_BRIDGE_TOKEN_SHA256
 ```
 
-The audited project currently contains only an empty `myFunction` and one HEAD deployment. A future controlled synchronization can add `SalesDataBridge.js` without depending on or changing the old `Sales_Report_Reminder` project.
+The value must be exactly 64 lowercase hexadecimal characters: the SHA-256 digest of a randomly generated raw token containing at least 32 random bytes. Never place the raw token in Apps Script, Script Properties, source control, the Sheet, a URL, or logs.
 
-## Why a bridge
+## Versioned deployment
 
-- Node needs only an HTTPS URL and one high-entropy token; it needs no Google credential file.
-- The Apps Script deployment executes as its owner and requests only the Sheets read-only scope.
-- Spreadsheet ID, tab, and maximum columns are server-side properties. Callers cannot request another spreadsheet or tab.
-- The bridge has no write operation and never changes source values, formulas, formatting, or structure.
-- The token travels in a POST body, not a query string, and Node refuses non-Google bridge hosts.
+Do not modify the unexplained existing HEAD deployment. After the property above is installed by the owner:
 
-Publishing the spreadsheet or using an unauthenticated CSV export was rejected because it would unnecessarily expose business data. Apps Script Execution API/OAuth was rejected because it recreates the local credential complexity this bridge is intended to remove.
+1. Confirm the remote project contains `Code.js`, `SalesDataBridge.js`, and `appsscript.json`, with the empty `myFunction` preserved.
+2. Create an immutable version with a descriptive label.
+3. Create a **new** web-app deployment for that version.
+4. Execute as: **User deploying the web app**.
+5. Access: **Anyone, including anonymous**. Anonymous access is necessary only because the high-entropy POST token replaces Google OAuth for the Node service.
+6. Authorize only `https://www.googleapis.com/auth/spreadsheets.readonly`.
+7. Put the new `/exec` URL and raw token in the ignored `.env` as `APPS_SCRIPT_BRIDGE_URL` and `APPS_SCRIPT_BRIDGE_TOKEN`.
 
-## Future deployment procedure (not performed)
+Before using live data, verify GET, no-token POST, bad-token POST, valid-token POST, caller-supplied source selectors, response headers, and response values. A valid response must report schema version 2 and exactly ten projected columns.
 
-1. Review `apps-script/SalesDataBridge.js` and `apps-script/appsscript.json`.
-2. Add the bridge file to the specified Apps Script project without deleting or overwriting unrelated files.
-3. In Apps Script Project Settings, set these Script Properties:
-
-   - `SALES_SPREADSHEET_ID`: `1gkKk3rk-mvVO3CIulFCswD8GvFDHo_5TGzAIqBzYqC0`
-   - `SALES_SHEET_TAB`: `Sales Data Base Monthly`
-   - `SALES_MAX_COLUMNS`: `123`
-   - `SALES_BRIDGE_TOKEN`: a unique, randomly generated secret of at least 32 bytes
-
-4. Deploy a web app that executes as the deploying owner and set access to `Anyone` so Node does not need Google OAuth. The high-entropy bearer-token check remains mandatory; if the Workspace administrator prohibits anonymous web apps, Google OAuth becomes a genuine deployment constraint.
-5. Authorize only the manifest's read-only Sheets scope.
-6. Put the deployment `/exec` URL and the same token in the new service's untracked `.env`:
-
-   ```env
-   GOOGLE_DATA_SOURCE=apps_script
-   APPS_SCRIPT_BRIDGE_URL=https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-   APPS_SCRIPT_BRIDGE_TOKEN=replace-with-the-secret
-   GOOGLE_SHEET_ID=1gkKk3rk-mvVO3CIulFCswD8GvFDHo_5TGzAIqBzYqC0
-   GOOGLE_SHEET_TAB=Sales Data Base Monthly
-   ```
-
-7. Run `npm run report:dry-run`. This path reads live data and creates PDFs but cannot initialize or send through WhatsApp.
-
-Rotate the bridge token immediately if it is exposed. Never commit it, paste it into a URL, or store it in the spreadsheet.
+Rotate the token immediately if either the raw token or its Node environment is exposed.

@@ -9,7 +9,7 @@ Production-oriented Node.js service for reading the monthly Google Sheet, resolv
 | TRS | Rows whose `Designation` is `T.S.O.` |
 | Field-force person | Rows whose `Designation` is `SR` |
 
-The service never writes to the source spreadsheet. A narrow Apps Script web bridge reads the one configured tab with the read-only Sheets scope and returns it to Node over HTTPS. Node does not require Google Application Default Credentials or a service-account JSON file.
+The service never writes to the source spreadsheet. A narrow Apps Script web bridge reads a fixed projection of the approved tab with the read-only Sheets scope and returns it to Node over HTTPS. Node does not require Google Application Default Credentials or a service-account JSON file. See [the Dashboard contract](docs/dashboard.md) for the non-secret settings boundary.
 
 ## Setup
 
@@ -39,7 +39,7 @@ npm start
 - `whatsapp:login` opens the persistent WhatsApp Web session and displays a QR code when authentication is needed; it never sends a message.
 - `npm start` starts the long-running scheduler. `RUN_ON_START=false` by default.
 
-WhatsApp delivery uses `whatsapp-web.js` with a persistent `LocalAuth` browser profile. No Meta Cloud API or paid API token is used. Real delivery requires `DRY_RUN=false`, `WHATSAPP_ENABLED=true`, and either `TEST_MODE=true` with `WHATSAPP_TEST_RECIPIENT`, or `ALLOW_REAL_DELIVERY=true` for mapped business recipients. Keep the default dry/test settings until the bridge, PDFs, and recipient mapping have been reviewed.
+WhatsApp delivery uses `whatsapp-web.js` with a persistent `LocalAuth` browser profile. No Meta Cloud API or paid API token is used. A test-mode delivery requires `DRY_RUN=false`, `WHATSAPP_ENABLED=true`, `WHATSAPP_TEST_RECIPIENT`, and one exact `WHATSAPP_TEST_REPORT_ID`; all other reports are skipped. Production delivery additionally requires `TEST_MODE=false` and `ALLOW_REAL_DELIVERY=true`, with the Dashboard gates also permitting delivery. Keep the defaults until the bridge, PDFs, and recipient mapping have been reviewed.
 
 The service auto-detects standard Brave, Chrome, and Edge installations. Set `WHATSAPP_BROWSER_PATH` if the deployment host uses another Chromium location.
 

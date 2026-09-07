@@ -23,6 +23,7 @@ test('reads the configured sheet through the Apps Script bridge without Google c
       request = { url: String(url), options };
       return response({
         ok: true,
+        schemaVersion: 2,
         spreadsheetId: 'sheet-id',
         tab: 'Sales Data Base Monthly',
         range: 'Sales Data Base Monthly!A1:DS2',
@@ -52,11 +53,26 @@ test('rejects bridge errors and unexpected tabs explicitly', async () => {
     /unauthorized/
   );
   await assert.rejects(
-    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, spreadsheetId: 'sheet-id', tab: 'Wrong Tab', values: [] }) }),
+    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, schemaVersion: 2, spreadsheetId: 'sheet-id', tab: 'Wrong Tab', values: [] }) }),
     /unexpected tab/
   );
   await assert.rejects(
-    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, spreadsheetId: 'wrong-sheet', tab: 'Sales Data Base Monthly', values: [] }) }),
+    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, schemaVersion: 2, spreadsheetId: 'wrong-sheet', tab: 'Sales Data Base Monthly', values: [] }) }),
     /unexpected spreadsheet/
+  );
+});
+
+test('rejects old, over-wide, and sensitive bridge payloads', async () => {
+  await assert.rejects(
+    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, spreadsheetId: 'sheet-id', tab: 'Sales Data Base Monthly', values: [] }) }),
+    /schema must be version 2/
+  );
+  await assert.rejects(
+    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, schemaVersion: 2, spreadsheetId: 'sheet-id', tab: 'Sales Data Base Monthly', values: [Array(11).fill('x')] }) }),
+    /approved field projection/
+  );
+  await assert.rejects(
+    readGoogleSheet(config, { fetchImpl: async () => response({ ok: true, schemaVersion: 2, spreadsheetId: 'sheet-id', tab: 'Sales Data Base Monthly', values: [[], [], [], ['Salary']] }) }),
+    /forbidden field/
   );
 });

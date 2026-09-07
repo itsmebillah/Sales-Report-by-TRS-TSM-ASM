@@ -35,7 +35,7 @@ function resolveColumns(headers) {
     joiningDate: exact('joining date')
   };
   const requiredColumns = new Set([
-    'id', 'rsm', 'tso', 'person', 'designation', 'dealerId', 'areaPoint',
+    'id', 'rsm', 'tso', 'person', 'designation', 'areaPoint',
     'sales', 'target', 'orders', 'currentWorkingDays'
   ]);
   const missing = Object.entries(columns)

@@ -40,8 +40,8 @@ export function normalizeSource(parsed, hierarchy) {
     const target = toNumber(row.cells[columns.target]);
     const orders = toNumber(row.cells[columns.orders]);
     const currentWorkingDays = toNumber(row.cells[columns.currentWorkingDays]);
-    const dealerId = toId(row.cells[columns.dealerId]);
-    const dealerName = normalizeText(row.cells[columns.areaPoint]) || null;
+    const dealerId = columns.dealerId >= 0 ? toId(row.cells[columns.dealerId]) : null;
+    const dealerName = null;
     const joiningDate = columns.joiningDate >= 0 ? row.cells[columns.joiningDate] : null;
     if (target === null) diagnostics.push({ code: 'MISSING_TARGET', severity: 'warn', row: row.rowNumber, personName });
     if (sales === null) diagnostics.push({ code: 'INVALID_OR_MISSING_SALES', severity: 'warn', row: row.rowNumber, personName });

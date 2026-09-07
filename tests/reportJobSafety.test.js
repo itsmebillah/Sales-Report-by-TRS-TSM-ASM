@@ -48,11 +48,15 @@ test('confirmation-pending records are not automatically delivered a second time
     },
     async disconnect() {}
   };
-  const config = testConfig(root, { DRY_RUN: 'false', WHATSAPP_ENABLED: 'true' });
+  const dryResult = await runReportJob({ config: testConfig(root), fixturePath, logger, sender });
+  const selectedReportId = dryResult.results[0].reportId;
+  const config = testConfig(root, {
+    DRY_RUN: 'false', WHATSAPP_ENABLED: 'true', WHATSAPP_TEST_REPORT_ID: selectedReportId
+  });
   const first = await runReportJob({ config, fixturePath, logger, sender });
-  assert.deepEqual(first.summary.delivery, { CONFIRMATION_PENDING: 6 });
-  assert.equal(sends, 6);
+  assert.deepEqual(first.summary.delivery, { CONFIRMATION_PENDING: 1 });
+  assert.equal(sends, 1);
   const second = await runReportJob({ config, fixturePath, logger, sender });
-  assert.deepEqual(second.summary.delivery, { SKIPPED: 6 });
-  assert.equal(sends, 6);
+  assert.deepEqual(second.summary.delivery, { SKIPPED: 1 });
+  assert.equal(sends, 1);
 });

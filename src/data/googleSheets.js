@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 
 const ALLOWED_BRIDGE_HOSTS = new Set(['script.google.com', 'script.googleusercontent.com']);
+const BRIDGE_SCHEMA_VERSION = 2;
+const MAX_PROJECTED_COLUMNS = 10;
+const FORBIDDEN_HEADERS = /salary|tada|joining|phone|mobile|contact|dealer sl/i;
 
 function validateBridgeUrl(value) {
   let url;
@@ -40,6 +43,16 @@ export async function readGoogleSheet(config, { fetchImpl = globalThis.fetch } =
   catch { throw new Error('Apps Script bridge returned invalid JSON'); }
   if (!payload?.ok) throw new Error(`Apps Script bridge rejected the request: ${payload?.error || 'unknown_error'}`);
   if (!Array.isArray(payload.values)) throw new Error('Apps Script bridge response is missing a values array');
+  if (payload.schemaVersion !== BRIDGE_SCHEMA_VERSION) {
+    throw new Error(`Apps Script bridge schema must be version ${BRIDGE_SCHEMA_VERSION}`);
+  }
+  if (payload.values.some((row) => !Array.isArray(row) || row.length > MAX_PROJECTED_COLUMNS)) {
+    throw new Error('Apps Script bridge response exceeds the approved field projection');
+  }
+  const serializedHeaders = JSON.stringify(payload.values[3] || []);
+  if (FORBIDDEN_HEADERS.test(serializedHeaders)) {
+    throw new Error('Apps Script bridge response contains a forbidden field');
+  }
   if (config.expectedSpreadsheetId && payload.spreadsheetId !== config.expectedSpreadsheetId) {
     throw new Error(`Apps Script bridge returned unexpected spreadsheet: ${payload.spreadsheetId || '(missing)'}`);
   }
@@ -52,7 +65,9 @@ export async function readGoogleSheet(config, { fetchImpl = globalThis.fetch } =
     tab: payload.tab,
     range: payload.range,
     values: payload.values,
-    generatedAt: payload.generatedAt || null
+    generatedAt: payload.generatedAt || null,
+    schemaVersion: payload.schemaVersion || null,
+    settings: payload.settings && typeof payload.settings === 'object' ? payload.settings : null
   };
 }
 
